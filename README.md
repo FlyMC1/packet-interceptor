@@ -273,9 +273,45 @@ Returns Bedrock versions loaded from Prismarine data paths.
 - `npm run dev`: local dev server.
 - `npm run build`: production build.
 - `npm run preview`: run built app.
+- `npm run desktop`: build + run as an Electron desktop app.
+- `npm run dist:win`: build a Windows installer (`.exe`) via electron-builder.
 - `npm run check`: type and Svelte checks.
 - `npm run lint`: prettier check + eslint.
 - `npm run format`: prettier write.
+
+## Desktop (.exe) Build
+
+This project can run as a desktop app and be packaged for Windows.
+
+1. Install dependencies:
+	- `npm install`
+2. Run as desktop app locally:
+	- `npm run desktop`
+3. Build Windows installer:
+	- `npm run dist:win`
+
+Output location:
+
+- Installer artifacts are written to `release/`.
+
+Notes:
+
+- The desktop shell starts the SvelteKit preview server internally and opens the UI in an Electron window.
+- If your environment enforces strict Node engine checks (for example Node 24 with `.npmrc` `engine-strict=true`), run:
+  - `npm install --engine-strict=false`
+- For the most predictable runtime, Node 18 or 20 is recommended for this codebase.
+
+## Packet Research Scope
+
+This tool is intended for authorized protocol analysis, debugging, and interoperability testing on systems you own or are permitted to test.
+
+Recommended workflow for deep packet analysis:
+
+1. Enable broad packet filters in `/configuration`.
+2. Start proxy and generate gameplay traffic on your own server.
+3. Use `/logger` to inspect event streams and payload shapes.
+4. Use `/watcher` to track packet families across boundaries over time.
+5. Record findings and implement server/client features in legitimate test environments.
 
 ## Security and Usage Notice
 
