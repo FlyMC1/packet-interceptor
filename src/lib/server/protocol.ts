@@ -10,16 +10,18 @@ const protocolUrl =
 let bedrockVersions: string[];
 
 const bedrockPackets: Record<string, string[] | undefined> = {};
+const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
+const protocolDir = path.join(appDataDir, "protocol");
 
 export async function init() {
-    if (!fs.existsSync("protocol")) fs.mkdirSync("protocol");
+    if (!fs.existsSync(protocolDir)) fs.mkdirSync(protocolDir, { recursive: true });
 
     const response = await (await fetch(dataPathsUrl)).json();
     bedrockVersions = Object.keys(response.bedrock);
 
-    const files = fs.readdirSync("protocol");
+    const files = fs.readdirSync(protocolDir);
     for (const file of files) {
-        fs.readFile(`protocol/${file}`, undefined, (err, data) => {
+        fs.readFile(path.join(protocolDir, file), undefined, (err, data) => {
             if (err) throw err;
 
             bedrockPackets[path.parse(file).name] = JSON.parse(data.toString());
@@ -38,7 +40,7 @@ export async function downloadPackets(version: string) {
     }
 
     bedrockPackets[version] = packets;
-    fs.writeFileSync(`protocol/${version}.json`, JSON.stringify(packets));
+    fs.writeFileSync(path.join(protocolDir, `${version}.json`), JSON.stringify(packets));
 
     Emitter.emit("protocol_downloaded", { version, packets });
 }

@@ -1,6 +1,8 @@
 {
     "name": "bedrock-packet-interceptor",
-    "version": "0.0.2",
+    "version": "0.0.4",
+    "description": "Desktop Bedrock packet relay and inspector",
+    "author": "FlyMC1",
     "main": "electron/main.cjs",
     "scripts": {
         "dev": "vite dev",
@@ -48,6 +50,9 @@
             "node_modules/**/*"
         ],
         "asar": true,
+        "asarUnpack": [
+            "build/**/*"
+        ],
         "directories": {
             "output": "release"
         },

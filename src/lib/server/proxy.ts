@@ -1,16 +1,20 @@
 import fs from "fs";
+import path from "path";
 import { Relay } from "bedrock-protocol";
 import type { Version } from "bedrock-protocol";
 
 import type { ProxySettings, ProxyState, ServerPayload } from "$lib/types";
 import Emitter from "$lib/server/emitter";
 
+const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
+const profilesDir = path.join(appDataDir, "profiles");
+
 let relay: Relay | undefined;
 
 let proxySettings: ProxySettings | undefined;
 const proxyState: ProxyState = {
     state: "uninitialized",
-    isAuthenticated: fs.existsSync("profiles")
+    isAuthenticated: fs.existsSync(profilesDir)
 };
 let allowedPackets: string[] = [];
 
@@ -49,7 +53,7 @@ export async function start() {
             },
             version: proxySettings.version as Version,
             // @ts-ignore
-            profilesFolder: "profiles"
+            profilesFolder: profilesDir
         });
 
         await relay.listen();
@@ -118,7 +122,7 @@ export function setSettings(settings: ProxySettings) {
 }
 
 export function logout() {
-    fs.rmSync("profiles", { recursive: true, force: true });
+    fs.rmSync(profilesDir, { recursive: true, force: true });
 
     proxyState.isAuthenticated = false;
     Emitter.emit("proxy_state_update", proxyState);

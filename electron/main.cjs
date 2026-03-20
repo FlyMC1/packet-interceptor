@@ -1,12 +1,12 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
-const { spawn } = require("child_process");
+const { fork } = require("child_process");
 
 const APP_PORT = process.env.APP_PORT || "4173";
 const APP_HOST = process.env.APP_HOST || "127.0.0.1";
 const APP_URL = `http://${APP_HOST}:${APP_PORT}`;
 
-let previewProcess;
+let serverProcess;
 
 function waitForServer(url, timeoutMs = 30000) {
     const started = Date.now();
@@ -32,23 +32,31 @@ function waitForServer(url, timeoutMs = 30000) {
     });
 }
 
-function startPreviewServer() {
-    const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+function getServerEntry() {
+    if (app.isPackaged) {
+        return path.join(process.resourcesPath, "app.asar.unpacked", "build", "index.js");
+    }
 
-    previewProcess = spawn(npmCmd, ["run", "preview", "--", "--host", APP_HOST, "--port", APP_PORT], {
-        cwd: path.resolve(__dirname, ".."),
+    return path.resolve(__dirname, "..", "build", "index.js");
+}
+
+function startServer() {
+    const serverEntry = getServerEntry();
+
+    serverProcess = fork(serverEntry, {
+        cwd: path.dirname(serverEntry),
         stdio: "inherit",
-        shell: false,
         env: {
             ...process.env,
-            APP_HOST,
-            APP_PORT
+            HOST: APP_HOST,
+            PORT: APP_PORT,
+            APP_DATA_DIR: app.getPath("userData")
         }
     });
 
-    previewProcess.on("exit", (code) => {
+    serverProcess.on("exit", (code) => {
         if (code !== 0) {
-            console.error(`Preview process exited with code ${code}`);
+            console.error(`Server process exited with code ${code}`);
         }
     });
 }
@@ -69,13 +77,17 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    startPreviewServer();
+    startServer();
 
     try {
         await waitForServer(APP_URL);
         await createWindow();
     } catch (error) {
         console.error(error);
+        dialog.showErrorBox(
+            "Bedrock Packet Interceptor",
+            "The internal server failed to start. Reinstall the app or check the bundled files."
+        );
         app.quit();
     }
 
@@ -96,7 +108,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-    if (previewProcess && !previewProcess.killed) {
-        previewProcess.kill("SIGTERM");
+    if (serverProcess && !serverProcess.killed) {
+        serverProcess.kill("SIGTERM");
     }
 });
