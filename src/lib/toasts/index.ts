@@ -14,8 +14,8 @@ export function sendToastSuccess(text: string) {
     });
 }
 
-export function sendToastError() {
-    toast.push("An error occurred. Please check the debugger", {
+export function sendToastError(text = "An error occurred. Please check the debugger") {
+    toast.push(text, {
         theme: {
             "--toastColor": "#FFFFFF",
             "--toastBackground": "#F44336",

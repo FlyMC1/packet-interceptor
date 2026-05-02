@@ -106,9 +106,11 @@ export function init() {
         });
 
         eventSource.addEventListener("server_error", (event) => {
-            console.error(JSON.parse(event.data));
+            const error = JSON.parse(event.data);
 
-            sendToastError();
+            console.error(error);
+
+            sendToastError(error.message ?? "An error occurred. Please check the debugger");
         });
 
         eventSource.addEventListener("protocol_downloaded", (event) => {
