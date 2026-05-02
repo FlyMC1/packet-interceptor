@@ -2,6 +2,7 @@ import { get } from "svelte/store";
 
 import {
     allowedLogs,
+    derivedValues,
     packetLimit,
     packets,
     proxyAuthenticated,
@@ -35,6 +36,7 @@ export function init() {
             if (data.state === "starting") {
                 allowedLogs.set([]);
                 watchedLogs.set([]);
+                derivedValues.set([]);
             }
 
             proxyState.set(data.state);
@@ -71,6 +73,20 @@ export function init() {
                     return logs;
                 });
             }
+        });
+
+        eventSource.addEventListener("derived_values_update", (event) => {
+            const data: ServerPayload<"derived_values_update"> = JSON.parse(event.data);
+
+            derivedValues.update((currentValues) => {
+                const next = new Map(currentValues.map((item) => [item.key, item]));
+
+                for (const value of data.values) {
+                    next.set(value.key, value);
+                }
+
+                return Array.from(next.values()).sort((a, b) => a.key.localeCompare(b.key));
+            });
         });
 
         eventSource.addEventListener("code_received", (event) => {
@@ -139,6 +155,13 @@ export function setAllowedPackets(payload: ClientPayload<"proxy_set_allowed_pack
 export function setSettings(payload: ProxySettings) {
     return post<"proxy_settings_update">({
         event: "proxy_settings_update",
+        payload
+    });
+}
+
+export function setValuePreset(payload: ClientPayload<"proxy_set_value_preset">) {
+    return post<"proxy_set_value_preset">({
+        event: "proxy_set_value_preset",
         payload
     });
 }

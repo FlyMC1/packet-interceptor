@@ -85,7 +85,7 @@ app.whenReady().then(async () => {
     } catch (error) {
         console.error(error);
         dialog.showErrorBox(
-            "Bedrock Packet Interceptor",
+            "Bedrock Value Monitor",
             "The internal server failed to start. Reinstall the app or check the bundled files."
         );
         app.quit();

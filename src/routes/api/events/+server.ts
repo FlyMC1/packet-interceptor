@@ -55,6 +55,9 @@ export async function POST(reqEvent: RequestEvent) {
         case "proxy_set_allowed_packets":
             proxy.setAllowedPackets(message.payload);
             break;
+        case "proxy_set_value_preset":
+            proxy.setValuePreset(message.payload);
+            break;
         case "proxy_logout":
             proxy.logout();
             break;

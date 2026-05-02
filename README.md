@@ -1,5 +1,30 @@
 # bedrock-packet-interceptor
 
+## Repurposed Goal: Bedrock Value Monitor
+
+This project can be used to extract gameplay values from Bedrock network packets (for example: health, max health, hunger, position, rotation, dimension, runtime IDs, and effect count) so you can compare behavior across versions.
+
+Important scope note:
+
+- This app does packet-level extraction only.
+- It does not perform process-memory signature scanning or DLL injection.
+
+Use `/values` while the proxy is running to see the latest detected values and each value's source packet + payload path.
+
+### Included Value Monitor Features
+
+- Focus presets: `all`, `combat`, `movement`, `player_state`.
+- Confidence score per extracted value.
+- Match strategy metadata (`exact_key`, `path_contains`, `position_parent`, `effect_array`).
+- One-click exports from `/values` to JSON and CSV with versioned filenames.
+- In-app compare page (`/compare`) to diff two export files.
+
+### Release Requirements
+
+- Use Node.js 18.x for this codebase.
+- Start the app, run Minecraft through the proxy, then export values per version.
+- Compare exported files across versions with `/compare` to update utility-client mappings.
+
 MITM relay and packet inspector for Minecraft: Bedrock Edition, with a Svelte web UI for configuration and live packet analysis.
 
 ## What This Repository Does

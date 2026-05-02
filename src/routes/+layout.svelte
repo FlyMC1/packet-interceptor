@@ -19,6 +19,12 @@
                 <a class="navbar-url" href="/configuration">Configuration</a>
             </li>
             <li class="navbar-item">
+                <a class="navbar-url" href="/values">Values</a>
+            </li>
+            <li class="navbar-item">
+                <a class="navbar-url" href="/compare">Compare</a>
+            </li>
+            <li class="navbar-item">
                 <a class="navbar-url" href="/logger">Logger</a>
             </li>
             <li class="navbar-item">

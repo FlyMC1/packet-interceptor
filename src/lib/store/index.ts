@@ -2,7 +2,14 @@ import { writable } from "svelte/store";
 
 import { browser } from "$app/environment";
 
-import type { PacketBoundary, ProxySettings, ProxyState, ServerPayload } from "$lib/types";
+import type {
+    DerivedValue,
+    PacketBoundary,
+    ProxySettings,
+    ProxyState,
+    ServerPayload,
+    ValuePreset
+} from "$lib/types";
 
 export function storable<T>(data: T, name: string) {
     const store = writable(data);
@@ -39,3 +46,5 @@ export const versions = writable<string[]>([]);
 export const packets = writable<string[] | undefined>();
 
 export const packetLimit = storable(100, "packet_limit");
+export const derivedValues = writable<DerivedValue[]>([]);
+export const valuePreset = storable<ValuePreset>("all", "value_preset");

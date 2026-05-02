@@ -3,8 +3,9 @@ import path from "path";
 import { Relay } from "bedrock-protocol";
 import type { Version } from "bedrock-protocol";
 
-import type { ProxySettings, ProxyState, ServerPayload } from "$lib/types";
+import type { ProxySettings, ProxyState, ServerPayload, ValuePreset } from "$lib/types";
 import Emitter from "$lib/server/emitter";
+import { extractDerivedValues } from "$lib/server/extractor";
 
 const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
 const profilesDir = path.join(appDataDir, "profiles");
@@ -17,6 +18,7 @@ const proxyState: ProxyState = {
     isAuthenticated: fs.existsSync(profilesDir)
 };
 let allowedPackets: string[] = [];
+let valuePreset: ValuePreset = "all";
 
 const sleep = () => new Promise((r) => setTimeout(r, 60));
 
@@ -68,28 +70,38 @@ export async function start() {
     relay.on("connect", (player) => {
         // @ts-ignore
         player.on("clientbound", (packet: Packet) => {
-            if (!allowedPackets.includes(packet.name)) return;
-
             const packetPayload: ServerPayload<"proxy_packet"> = {
                 ...packet,
                 boundary: "clientbound",
                 timestamp: Date.now()
             };
 
-            Emitter.emit("proxy_packet", packetPayload);
+            if (allowedPackets.includes(packet.name)) {
+                Emitter.emit("proxy_packet", packetPayload);
+            }
+
+            const values = extractDerivedValues(packetPayload, valuePreset);
+            if (values.length > 0) {
+                Emitter.emit("derived_values_update", { values });
+            }
         });
 
         // @ts-ignore
         player.on("serverbound", (packet: Packet) => {
-            if (!allowedPackets.includes(packet.name)) return;
-
             const packetPayload: ServerPayload<"proxy_packet"> = {
                 ...packet,
                 boundary: "serverbound",
                 timestamp: Date.now()
             };
 
-            Emitter.emit("proxy_packet", packetPayload);
+            if (allowedPackets.includes(packet.name)) {
+                Emitter.emit("proxy_packet", packetPayload);
+            }
+
+            const values = extractDerivedValues(packetPayload, valuePreset);
+            if (values.length > 0) {
+                Emitter.emit("derived_values_update", { values });
+            }
         });
     });
 
@@ -115,6 +127,10 @@ export async function stop(error?: Error) {
 
 export function setAllowedPackets(packets: string[]) {
     allowedPackets = packets;
+}
+
+export function setValuePreset(preset: ValuePreset) {
+    valuePreset = preset;
 }
 
 export function setSettings(settings: ProxySettings) {

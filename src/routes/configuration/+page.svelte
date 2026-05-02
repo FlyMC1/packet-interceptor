@@ -13,7 +13,8 @@
         proxyPort,
         proxyState,
         proxyAuthenticated,
-        proxyOffline
+        proxyOffline,
+        valuePreset
     } from "$lib/store";
 
     import { getPackets, getVersions } from "$lib/api/protocol";
@@ -63,6 +64,10 @@
         return eventsApi.setAllowedPackets($allowedPackets);
     }
 
+    function setValuePreset() {
+        return eventsApi.setValuePreset($valuePreset);
+    }
+
     function updateAllowedPackets(input) {
         const packet = input.name;
 
@@ -100,6 +105,7 @@
     async function startProxy() {
         await Promise.all([
             setAllowedPackets(),
+            setValuePreset(),
             setSettings({
                 sourcePort: $proxySourcePort,
                 ip: $proxyIp,
@@ -201,6 +207,14 @@
                 bind:value={$packetLimit}
                 required
             />
+
+            <select bind:value={$valuePreset} on:change={setValuePreset}>
+                <option value="all">Value Preset: All</option>
+                <option value="combat">Value Preset: Combat</option>
+                <option value="movement">Value Preset: Movement</option>
+                <option value="player_state">Value Preset: Player State</option>
+            </select>
+
             <div class="flex flex-col w-full" class:gap-3={showFilters}>
                 <button
                     class:inactive={$packets === undefined}
