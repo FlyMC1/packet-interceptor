@@ -11,15 +11,22 @@ import { extractDerivedValues } from "$lib/server/extractor";
 const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
 const profilesDir = path.join(appDataDir, "profiles");
 const require = createRequire(import.meta.url);
+const optionsModule = (() => {
+    try {
+        return require("bedrock-protocol/src/options") as {
+            defaultOptions?: { raknetBackend?: string };
+            Versions?: Record<string, number>;
+        };
+    } catch (error) {
+        console.warn("Unable to load bedrock-protocol options", error);
+        return undefined;
+    }
+})();
 
 const preferredRaknetBackend =
     process.env.BEDROCK_RAKNET_BACKEND ?? (process.platform === "win32" ? "jsp-raknet" : "raknet-native");
 
 try {
-    const optionsModule = require("bedrock-protocol/src/options") as {
-        defaultOptions?: { raknetBackend?: string };
-    };
-
     if (optionsModule.defaultOptions) {
         optionsModule.defaultOptions.raknetBackend = preferredRaknetBackend;
     }
@@ -83,10 +90,45 @@ function normalizeVersion(version: string): string {
 function isSupportedVersion(version: string): version is Version {
     return /^1\.\d+\.\d+$/.test(version);
 }
+
+function compareVersions(a: string, b: string): number {
+    const left = a.split(".").map((n) => Number.parseInt(n, 10));
+    const right = b.split(".").map((n) => Number.parseInt(n, 10));
+
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i++) {
+        const l = left[i] ?? 0;
+        const r = right[i] ?? 0;
+        if (l !== r) return l - r;
+    }
+
+    return 0;
+}
+
+function getLatestSupportedVersion(): string | undefined {
+    const versions = Object.keys(optionsModule?.Versions ?? {}).filter(isSupportedVersion);
+    if (versions.length === 0) return undefined;
+
+    versions.sort(compareVersions);
+    return versions[versions.length - 1];
+}
+
 function resolveProxyVersion(settings: ProxySettings): Version {
     const configuredVersion = normalizeVersion(settings.version);
+    const latestSupported = getLatestSupportedVersion() ?? "1.21.120";
 
-    return (isSupportedVersion(configuredVersion) ? configuredVersion : "1.21.120") as Version;
+    if (!isSupportedVersion(configuredVersion)) {
+        return latestSupported as Version;
+    }
+
+    if (compareVersions(configuredVersion, latestSupported) < 0) {
+        Emitter.emit("server_error", {
+            message: `Configured version ${configuredVersion} is older than latest supported ${latestSupported}; using ${latestSupported}.`
+        });
+        return latestSupported as Version;
+    }
+
+    return configuredVersion as Version;
 }
 
 export async function start() {
