@@ -5,21 +5,60 @@ import * as proxy from "$lib/server/proxy";
 import Emitter from "$lib/server/emitter";
 import type { ClientMessage } from "$lib/types";
 
+function safeJson(data: unknown): string {
+    const seen = new WeakSet<object>();
+
+    return JSON.stringify(data, (_, value) => {
+        if (typeof value === "bigint") {
+            return value.toString();
+        }
+
+        if (value instanceof Error) {
+            return {
+                name: value.name,
+                message: value.message,
+                stack: value.stack
+            };
+        }
+
+        if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) {
+            return {
+                type: "Buffer",
+                length: value.length,
+                base64: value.toString("base64")
+            };
+        }
+
+        if (value && typeof value === "object") {
+            if (seen.has(value)) {
+                return "[Circular]";
+            }
+            seen.add(value);
+        }
+
+        return value;
+    });
+}
+
 export function GET() {
     let listener: (event: { event: string; payload?: object }) => void;
 
     const stream = new ReadableStream({
         start(controller) {
             const sendEvent = (eventName: string, args?: object) => {
-                controller.enqueue(
-                    `event: ${eventName}\ndata:${
-                        args
-                            ? ` ${JSON.stringify(args, (_, value) =>
-                                  typeof value === "bigint" ? value.toString() : value
-                              )}`
-                            : ""
-                    }\n\n`
-                );
+                try {
+                    controller.enqueue(
+                        `event: ${eventName}\ndata:${args ? ` ${safeJson(args)}` : ""}\n\n`
+                    );
+                } catch (error) {
+                    controller.enqueue(
+                        `event: server_error\ndata: ${safeJson({
+                            message: "Failed to serialize server event payload",
+                            details: error instanceof Error ? error.message : String(error),
+                            eventName
+                        })}\n\n`
+                    );
+                }
             };
 
             sendEvent("proxy_state_update", proxy.getState());

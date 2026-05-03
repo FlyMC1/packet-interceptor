@@ -22,6 +22,29 @@ let valuePreset: ValuePreset = "all";
 
 const sleep = () => new Promise((r) => setTimeout(r, 60));
 
+function emitProcessingError(error: unknown, context: string) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    Emitter.emit("server_error", {
+        message: `${context}: ${message}`,
+        stack
+    });
+}
+
+function isRecoverableProxyError(error: Error) {
+    const msg = `${error.message} ${error.stack ?? ""}`.toLowerCase();
+    return (
+        msg.includes("unknown parametrizable") ||
+        msg.includes("bitflags") ||
+        msg.includes("bit tags") ||
+        msg.includes("partialread") ||
+        msg.includes("deserialize") ||
+        msg.includes("serialize") ||
+        msg.includes("parse")
+    );
+}
+
 /**
  * Normalizes a Minecraft Bedrock version string for use with bedrock-protocol.
  * GDK-format versions (1.21.120.4) use a 4-part scheme; bedrock-protocol expects
@@ -81,45 +104,47 @@ export async function start() {
     Emitter.emit("proxy_state_update", proxyState);
 
     relay.on("connect", (player) => {
+        const handlePacket = (boundary: "clientbound" | "serverbound", packet: Packet) => {
+            try {
+                const packetPayload: ServerPayload<"proxy_packet"> = {
+                    ...packet,
+                    boundary,
+                    timestamp: Date.now()
+                };
+
+                if (allowedPackets.includes(packet.name)) {
+                    Emitter.emit("proxy_packet", packetPayload);
+                }
+
+                const values = extractDerivedValues(packetPayload, valuePreset);
+                if (values.length > 0) {
+                    Emitter.emit("derived_values_update", { values });
+                }
+            } catch (error) {
+                emitProcessingError(error, `Packet processing failed (${boundary})`);
+            }
+        };
+
         // @ts-ignore
         player.on("clientbound", (packet: Packet) => {
-            const packetPayload: ServerPayload<"proxy_packet"> = {
-                ...packet,
-                boundary: "clientbound",
-                timestamp: Date.now()
-            };
-
-            if (allowedPackets.includes(packet.name)) {
-                Emitter.emit("proxy_packet", packetPayload);
-            }
-
-            const values = extractDerivedValues(packetPayload, valuePreset);
-            if (values.length > 0) {
-                Emitter.emit("derived_values_update", { values });
-            }
+            handlePacket("clientbound", packet);
         });
 
         // @ts-ignore
         player.on("serverbound", (packet: Packet) => {
-            const packetPayload: ServerPayload<"proxy_packet"> = {
-                ...packet,
-                boundary: "serverbound",
-                timestamp: Date.now()
-            };
-
-            if (allowedPackets.includes(packet.name)) {
-                Emitter.emit("proxy_packet", packetPayload);
-            }
-
-            const values = extractDerivedValues(packetPayload, valuePreset);
-            if (values.length > 0) {
-                Emitter.emit("derived_values_update", { values });
-            }
+            handlePacket("serverbound", packet);
         });
     });
 
     // @ts-ignore
-    relay.on("error", (error: Error) => stop(error));
+    relay.on("error", (error: Error) => {
+        if (isRecoverableProxyError(error)) {
+            emitProcessingError(error, "Recoverable proxy parse error");
+            return;
+        }
+
+        stop(error);
+    });
 }
 
 export async function stop(error?: Error) {
