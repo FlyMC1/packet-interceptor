@@ -16,7 +16,7 @@ const protocolDir = path.join(appDataDir, "protocol");
 export async function init() {
     if (!fs.existsSync(protocolDir)) fs.mkdirSync(protocolDir, { recursive: true });
 
-    const response = await (await fetch(dataPathsUrl)).json();
+    const response = await (await fetch(dataPathsUrl, { headers: { "Accept-Encoding": "identity" } })).json();
     // Filter to only properly-formed MC Bedrock versions (1.x.y or 1.x.y.z).
     // dataPaths.json also contains internal protocol numbers like "26.10" which
     // are not valid version strings for bedrock-protocol.
@@ -38,7 +38,7 @@ export async function downloadPackets(version: string) {
     let packets: string[] = [];
 
     try {
-        const response = await (await fetch(protocolUrl.replace("{VERSION}", version))).json();
+        const response = await (await fetch(protocolUrl.replace("{VERSION}", version), { headers: { "Accept-Encoding": "identity" } })).json();
         packets = Object.values(response.types.mcpe_packet[1][0].type[1].mappings);
     } catch (e) {
         console.error(e);

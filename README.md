@@ -296,8 +296,12 @@ Returns Bedrock versions loaded from Prismarine data paths.
 ## Development Commands
 
 - `npm run dev`: local dev server.
+- `npm run dev:5174`: local dev server on port 5174.
+- `npm run dev:5175`: local dev server on port 5175.
 - `npm run build`: production build.
 - `npm run preview`: run built app.
+- `npm run preview:4174`: preview server on port 4174.
+- `npm run preview:4175`: preview server on port 4175.
 - `npm run desktop`: build + run as an Electron desktop app.
 - `npm run dist:win`: build a Windows installer (`.exe`) via electron-builder.
 - `npm run check`: type and Svelte checks.

@@ -23,10 +23,14 @@
     import { formatPacketName } from "$lib/utils/format.js";
     import { setSettings } from "$lib/api/events";
 
+    const commonPortPresets = [19132, 19133, 25565, 3000, 8080];
+
     onMount(async () => {
         if ($versions.length === 0) $versions = await getVersions();
 
-        if (!$proxyVersion) $proxyVersion = $versions[$versions.length - 1];
+        if (!$proxyVersion && $versions.length > 0) {
+            $proxyVersion = $versions[$versions.length - 1];
+        }
 
         await fetchPackets($proxyVersion);
 
@@ -68,7 +72,7 @@
         return eventsApi.setValuePreset($valuePreset);
     }
 
-    function updateAllowedPackets(input) {
+    function updateAllowedPackets(input: HTMLInputElement) {
         const packet = input.name;
 
         if (input.checked) {
@@ -86,7 +90,7 @@
         return setAllowedPackets();
     }
 
-    function updateWatchedPackets(input) {
+    function updateWatchedPackets(input: HTMLInputElement) {
         const packet = input.name;
 
         if (input.checked) {
@@ -125,6 +129,22 @@
     function logout() {
         return eventsApi.logout();
     }
+
+    function applySourcePortPreset(event: Event) {
+        const input = event.currentTarget as HTMLSelectElement;
+        const value = Number.parseInt(input.value, 10);
+        if (Number.isInteger(value) && value > 0 && value <= 65535) {
+            $proxySourcePort = value;
+        }
+    }
+
+    function applyDestinationPortPreset(event: Event) {
+        const input = event.currentTarget as HTMLSelectElement;
+        const value = Number.parseInt(input.value, 10);
+        if (Number.isInteger(value) && value > 0 && value <= 65535) {
+            $proxyPort = value;
+        }
+    }
 </script>
 
 <svelte:head>
@@ -146,6 +166,18 @@
                 bind:value={$proxySourcePort}
                 class:inactive={$proxyState !== "uninitialized"}
             />
+
+            <select
+                class:inactive={$proxyState !== "uninitialized"}
+                on:change={applySourcePortPreset}
+                value=""
+            >
+                <option value="">SOURCE PORT PRESET</option>
+                {#each commonPortPresets as port}
+                    <option value={port}>{port}</option>
+                {/each}
+            </select>
+
             <div class="flex gap-3">
                 <input
                     placeholder="DESTINATION IP"
@@ -166,6 +198,17 @@
                     class:inactive={$proxyState !== "uninitialized"}
                 />
             </div>
+
+            <select
+                class:inactive={$proxyState !== "uninitialized"}
+                on:change={applyDestinationPortPreset}
+                value=""
+            >
+                <option value="">DESTINATION PORT PRESET</option>
+                {#each commonPortPresets as port}
+                    <option value={port}>{port}</option>
+                {/each}
+            </select>
 
             <select
                 class:inactive={$packets === undefined || $proxyState !== "uninitialized"}

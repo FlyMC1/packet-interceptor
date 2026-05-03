@@ -1,12 +1,53 @@
 const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
+const net = require("net");
 const { fork } = require("child_process");
 
-const APP_PORT = process.env.APP_PORT || "4173";
+const DEFAULT_APP_PORTS = [4173, 4174, 4175];
+const APP_PORTS = parsePortCandidates(process.env.APP_PORTS, process.env.APP_PORT);
 const APP_HOST = process.env.APP_HOST || "127.0.0.1";
-const APP_URL = `http://${APP_HOST}:${APP_PORT}`;
 
 let serverProcess;
+let activeAppUrl;
+
+function parsePortCandidates(portList, singlePort) {
+    const fromList = (portList || "")
+        .split(",")
+        .map((value) => Number.parseInt(value.trim(), 10))
+        .filter((value) => Number.isInteger(value) && value > 0 && value <= 65535);
+
+    if (fromList.length > 0) return fromList;
+
+    const parsedSingle = Number.parseInt(singlePort || "", 10);
+    if (Number.isInteger(parsedSingle) && parsedSingle > 0 && parsedSingle <= 65535) {
+        return [parsedSingle];
+    }
+
+    return DEFAULT_APP_PORTS;
+}
+
+function canListen(host, port) {
+    return new Promise((resolve) => {
+        const testServer = net.createServer();
+
+        testServer.once("error", () => {
+            resolve(false);
+        });
+
+        testServer.listen(port, host, () => {
+            testServer.close(() => resolve(true));
+        });
+    });
+}
+
+async function pickAvailablePort(host, candidates) {
+    for (const port of candidates) {
+        // Prefer first available candidate to keep URL predictable for users.
+        if (await canListen(host, port)) return String(port);
+    }
+
+    throw new Error(`No available internal server ports in: ${candidates.join(", ")}`);
+}
 
 function waitForServer(url, timeoutMs = 30000) {
     const started = Date.now();
@@ -40,7 +81,7 @@ function getServerEntry() {
     return path.resolve(__dirname, "..", "build", "index.js");
 }
 
-function startServer() {
+function startServer(port) {
     const serverEntry = getServerEntry();
 
     serverProcess = fork(serverEntry, {
@@ -49,7 +90,7 @@ function startServer() {
         env: {
             ...process.env,
             HOST: APP_HOST,
-            PORT: APP_PORT,
+            PORT: port,
             APP_DATA_DIR: app.getPath("userData")
         }
     });
@@ -61,7 +102,7 @@ function startServer() {
     });
 }
 
-async function createWindow() {
+async function createWindow(url) {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -73,27 +114,30 @@ async function createWindow() {
         }
     });
 
-    await win.loadURL(APP_URL);
+    await win.loadURL(url);
 }
 
 app.whenReady().then(async () => {
-    startServer();
-
     try {
-        await waitForServer(APP_URL);
-        await createWindow();
+        const port = await pickAvailablePort(APP_HOST, APP_PORTS);
+        const appUrl = `http://${APP_HOST}:${port}`;
+        activeAppUrl = appUrl;
+
+        startServer(port);
+        await waitForServer(appUrl);
+        await createWindow(appUrl);
     } catch (error) {
         console.error(error);
         dialog.showErrorBox(
             "Bedrock Value Monitor",
-            "The internal server failed to start. Reinstall the app or check the bundled files."
+            "The internal server failed to start. Try closing other instances or set APP_PORT/APP_PORTS to a free port."
         );
         app.quit();
     }
 
     app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow().catch((err) => {
+            createWindow(activeAppUrl || `http://${APP_HOST}:${APP_PORTS[0]}`).catch((err) => {
                 console.error(err);
                 app.quit();
             });

@@ -22,6 +22,16 @@ let valuePreset: ValuePreset = "all";
 
 const sleep = () => new Promise((r) => setTimeout(r, 60));
 
+function formatProxyErrorMessage(error: Error): string {
+    const message = (error.message || "").toLowerCase();
+
+    if (message.includes("expired_token") || message.includes("device_code")) {
+        return "Microsoft sign-in code expired. Start the proxy again to get a new code, then complete sign-in immediately.";
+    }
+
+    return error.message;
+}
+
 function emitProcessingError(error: unknown, context: string) {
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
@@ -139,7 +149,13 @@ export async function stop(error?: Error) {
     Emitter.emit("proxy_state_update", proxyState);
 
     if (error) {
-        Emitter.emit("server_error", { stack: error.stack, message: error.message });
+        const formattedMessage = formatProxyErrorMessage(error);
+        if (formattedMessage.toLowerCase().includes("sign-in code expired")) {
+            proxyState.isAuthenticated = false;
+            Emitter.emit("proxy_state_update", proxyState);
+        }
+
+        Emitter.emit("server_error", { stack: error.stack, message: formattedMessage });
     }
 }
 
