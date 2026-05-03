@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { createRequire } from "module";
 import { Relay } from "bedrock-protocol";
 import type { Version } from "bedrock-protocol";
 
@@ -9,6 +10,22 @@ import { extractDerivedValues } from "$lib/server/extractor";
 
 const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
 const profilesDir = path.join(appDataDir, "profiles");
+const require = createRequire(import.meta.url);
+
+const preferredRaknetBackend =
+    process.env.BEDROCK_RAKNET_BACKEND ?? (process.platform === "win32" ? "jsp-raknet" : "raknet-native");
+
+try {
+    const optionsModule = require("bedrock-protocol/src/options") as {
+        defaultOptions?: { raknetBackend?: string };
+    };
+
+    if (optionsModule.defaultOptions) {
+        optionsModule.defaultOptions.raknetBackend = preferredRaknetBackend;
+    }
+} catch (error) {
+    console.warn("Unable to configure Bedrock raknet backend override", error);
+}
 
 let relay: Relay | undefined;
 
@@ -68,6 +85,8 @@ export async function start() {
         relay = new Relay({
             host: "0.0.0.0",
             port: proxySettings.sourcePort,
+            raknetBackend: preferredRaknetBackend,
+            useNativeRaknet: preferredRaknetBackend === "raknet-native",
             destination: {
                 host: proxySettings.ip,
                 port: proxySettings.port,
