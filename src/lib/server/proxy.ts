@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
-import { Relay } from "bedrock-protocol";
+import { Relay, ping } from "bedrock-protocol";
 import type { Version } from "bedrock-protocol";
 
 import type { ProxySettings, ProxyState, ServerPayload, ValuePreset } from "$lib/types";
@@ -72,6 +72,35 @@ function normalizeVersion(version: string): string {
     return version;
 }
 
+function isSupportedVersion(version: string): version is Version {
+    return /^1\.\d+\.\d+$/.test(version);
+}
+
+async function resolveProxyVersion(settings: ProxySettings): Promise<Version> {
+    const configuredVersion = normalizeVersion(settings.version);
+
+    try {
+        const ad = await ping({ host: settings.ip, port: settings.port });
+        const detectedVersion = normalizeVersion(ad.version || "");
+
+        if (isSupportedVersion(detectedVersion)) {
+            if (detectedVersion !== configuredVersion) {
+                Emitter.emit("server_error", {
+                    message: `Destination server advertises ${detectedVersion}. Using that version instead of configured ${configuredVersion}.`
+                });
+            }
+
+            return detectedVersion;
+        }
+    } catch {
+        // Keep configured version if version detection fails.
+    }
+
+    return (isSupportedVersion(configuredVersion)
+        ? configuredVersion
+        : "1.21.120") as Version;
+}
+
 export async function start() {
     if (proxySettings === undefined || relay !== undefined) return;
 
@@ -81,6 +110,8 @@ export async function start() {
 
         // ???
         await sleep();
+
+        const relayVersion = await resolveProxyVersion(proxySettings);
 
         relay = new Relay({
             host: "0.0.0.0",
@@ -105,7 +136,7 @@ export async function start() {
                 proxyState.isAuthenticated = true;
                 Emitter.emit("proxy_state_update", proxyState);
             },
-            version: normalizeVersion(proxySettings.version) as Version,
+            version: relayVersion,
             // @ts-ignore
             profilesFolder: profilesDir
         });
