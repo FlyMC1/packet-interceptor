@@ -1,6 +1,6 @@
 {
     "name": "bedrock-value-monitor",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "Desktop Bedrock value monitor and protocol diff tool",
     "author": "FlyMC1",
     "main": "electron/main.cjs",
@@ -72,6 +72,7 @@
     },
     "type": "module",
     "dependencies": {
-        "bedrock-protocol": "^3.41.0"
+        "bedrock-protocol": "^3.55.1",
+        "minecraft-data": "^3.109.1"
     }
 }

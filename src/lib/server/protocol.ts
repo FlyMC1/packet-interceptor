@@ -17,7 +17,12 @@ export async function init() {
     if (!fs.existsSync(protocolDir)) fs.mkdirSync(protocolDir, { recursive: true });
 
     const response = await (await fetch(dataPathsUrl)).json();
-    bedrockVersions = Object.keys(response.bedrock);
+    // Filter to only properly-formed MC Bedrock versions (1.x.y or 1.x.y.z).
+    // dataPaths.json also contains internal protocol numbers like "26.10" which
+    // are not valid version strings for bedrock-protocol.
+    bedrockVersions = Object.keys(response.bedrock).filter((v) =>
+        /^1\.\d+\.\d+(\.\d+)?$/.test(v)
+    );
 
     const files = fs.readdirSync(protocolDir);
     for (const file of files) {

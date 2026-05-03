@@ -22,6 +22,19 @@ let valuePreset: ValuePreset = "all";
 
 const sleep = () => new Promise((r) => setTimeout(r, 60));
 
+/**
+ * Normalizes a Minecraft Bedrock version string for use with bedrock-protocol.
+ * GDK-format versions (1.21.120.4) use a 4-part scheme; bedrock-protocol expects
+ * the 3-part protocol version (1.21.120). Strips the 4th part when present.
+ */
+function normalizeVersion(version: string): string {
+    const parts = version.split(".");
+    if (parts.length === 4) {
+        return parts.slice(0, 3).join(".");
+    }
+    return version;
+}
+
 export async function start() {
     if (proxySettings === undefined || relay !== undefined) return;
 
@@ -53,7 +66,7 @@ export async function start() {
                 proxyState.isAuthenticated = true;
                 Emitter.emit("proxy_state_update", proxyState);
             },
-            version: proxySettings.version as Version,
+            version: normalizeVersion(proxySettings.version) as Version,
             // @ts-ignore
             profilesFolder: profilesDir
         });
