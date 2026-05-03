@@ -73,6 +73,7 @@
     "type": "module",
     "dependencies": {
         "bedrock-protocol": "^3.55.1",
-        "minecraft-data": "^3.109.1"
+        "minecraft-data": "^3.109.1",
+        "protodef": "^1.19.0"
     }
 }
