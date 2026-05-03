@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
-import { Relay, ping } from "bedrock-protocol";
+import { Relay } from "bedrock-protocol";
 import type { Version } from "bedrock-protocol";
 
 import type { ProxySettings, ProxyState, ServerPayload, ValuePreset } from "$lib/types";
@@ -11,11 +11,6 @@ import { extractDerivedValues } from "$lib/server/extractor";
 const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
 const profilesDir = path.join(appDataDir, "profiles");
 const require = createRequire(import.meta.url);
-const minecraftData = require("minecraft-data") as {
-    versions?: {
-        bedrock?: Array<{ minecraftVersion?: string; version?: number; releaseType?: string }>;
-    };
-};
 
 const preferredRaknetBackend =
     process.env.BEDROCK_RAKNET_BACKEND ?? (process.platform === "win32" ? "jsp-raknet" : "raknet-native");
@@ -51,6 +46,14 @@ function formatProxyErrorMessage(error: Error): string {
         return "Microsoft sign-in code expired. Start the proxy again to get a new code, then complete sign-in immediately.";
     }
 
+    if (message.includes("outdated server") || message.includes("failed_client")) {
+        return "Version mismatch: your Minecraft client is newer than the destination server/proxy version. Select a matching Minecraft version in Configuration and reconnect.";
+    }
+
+    if (message.includes("outdated client") || message.includes("failed_server")) {
+        return "Version mismatch: your Minecraft client is older than the destination server/proxy version. Update your game or choose an older destination/proxy version.";
+    }
+
     return error.message;
 }
 
@@ -80,49 +83,10 @@ function normalizeVersion(version: string): string {
 function isSupportedVersion(version: string): version is Version {
     return /^1\.\d+\.\d+$/.test(version);
 }
-
-function resolveVersionFromProtocol(protocol?: number): string | undefined {
-    if (!Number.isFinite(protocol)) return undefined;
-
-    const versions = minecraftData.versions?.bedrock ?? [];
-    const candidates = versions.filter(
-        (v) => v.releaseType === "release" && Number(v.version) === Number(protocol) && v.minecraftVersion
-    );
-
-    if (candidates.length === 0) return undefined;
-
-    return normalizeVersion(candidates[candidates.length - 1].minecraftVersion as string);
-}
-
-async function resolveProxyVersion(settings: ProxySettings): Promise<Version> {
+function resolveProxyVersion(settings: ProxySettings): Version {
     const configuredVersion = normalizeVersion(settings.version);
 
-    try {
-        const ad = await ping({ host: settings.ip, port: settings.port });
-        const detectedByProtocol = resolveVersionFromProtocol(Number(ad.protocol));
-        const detectedByText = normalizeVersion(ad.version || "");
-        const detectedVersion = detectedByProtocol ?? detectedByText;
-
-        if (isSupportedVersion(detectedVersion)) {
-            if (detectedVersion !== configuredVersion) {
-                Emitter.emit("server_error", {
-                    message: `Destination server advertises ${ad.version || "unknown"} (protocol ${String(ad.protocol ?? "unknown")}). Using ${detectedVersion} instead of configured ${configuredVersion}.`
-                });
-            }
-
-            return detectedVersion;
-        }
-
-        Emitter.emit("server_error", {
-            message: `Unable to map destination version ${ad.version || "unknown"} (protocol ${String(ad.protocol ?? "unknown")}); keeping configured ${configuredVersion}.`
-        });
-    } catch {
-        // Keep configured version if version detection fails.
-    }
-
-    return (isSupportedVersion(configuredVersion)
-        ? configuredVersion
-        : "1.21.120") as Version;
+    return (isSupportedVersion(configuredVersion) ? configuredVersion : "1.21.120") as Version;
 }
 
 export async function start() {
@@ -135,7 +99,7 @@ export async function start() {
         // ???
         await sleep();
 
-        const relayVersion = await resolveProxyVersion(proxySettings);
+        const relayVersion = resolveProxyVersion(proxySettings);
 
         relay = new Relay({
             host: "0.0.0.0",
