@@ -11,6 +11,11 @@ import { extractDerivedValues } from "$lib/server/extractor";
 const appDataDir = process.env.APP_DATA_DIR ?? process.cwd();
 const profilesDir = path.join(appDataDir, "profiles");
 const require = createRequire(import.meta.url);
+const minecraftData = require("minecraft-data") as {
+    versions?: {
+        bedrock?: Array<{ minecraftVersion?: string; version?: number; releaseType?: string }>;
+    };
+};
 
 const preferredRaknetBackend =
     process.env.BEDROCK_RAKNET_BACKEND ?? (process.platform === "win32" ? "jsp-raknet" : "raknet-native");
@@ -76,22 +81,41 @@ function isSupportedVersion(version: string): version is Version {
     return /^1\.\d+\.\d+$/.test(version);
 }
 
+function resolveVersionFromProtocol(protocol?: number): string | undefined {
+    if (!Number.isFinite(protocol)) return undefined;
+
+    const versions = minecraftData.versions?.bedrock ?? [];
+    const candidates = versions.filter(
+        (v) => v.releaseType === "release" && Number(v.version) === Number(protocol) && v.minecraftVersion
+    );
+
+    if (candidates.length === 0) return undefined;
+
+    return normalizeVersion(candidates[candidates.length - 1].minecraftVersion as string);
+}
+
 async function resolveProxyVersion(settings: ProxySettings): Promise<Version> {
     const configuredVersion = normalizeVersion(settings.version);
 
     try {
         const ad = await ping({ host: settings.ip, port: settings.port });
-        const detectedVersion = normalizeVersion(ad.version || "");
+        const detectedByProtocol = resolveVersionFromProtocol(Number(ad.protocol));
+        const detectedByText = normalizeVersion(ad.version || "");
+        const detectedVersion = detectedByProtocol ?? detectedByText;
 
         if (isSupportedVersion(detectedVersion)) {
             if (detectedVersion !== configuredVersion) {
                 Emitter.emit("server_error", {
-                    message: `Destination server advertises ${detectedVersion}. Using that version instead of configured ${configuredVersion}.`
+                    message: `Destination server advertises ${ad.version || "unknown"} (protocol ${String(ad.protocol ?? "unknown")}). Using ${detectedVersion} instead of configured ${configuredVersion}.`
                 });
             }
 
             return detectedVersion;
         }
+
+        Emitter.emit("server_error", {
+            message: `Unable to map destination version ${ad.version || "unknown"} (protocol ${String(ad.protocol ?? "unknown")}); keeping configured ${configuredVersion}.`
+        });
     } catch {
         // Keep configured version if version detection fails.
     }
