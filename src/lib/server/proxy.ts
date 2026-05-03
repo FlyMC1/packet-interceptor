@@ -32,19 +32,6 @@ function emitProcessingError(error: unknown, context: string) {
     });
 }
 
-function isRecoverableProxyError(error: Error) {
-    const msg = `${error.message} ${error.stack ?? ""}`.toLowerCase();
-    return (
-        msg.includes("unknown parametrizable") ||
-        msg.includes("bitflags") ||
-        msg.includes("bit tags") ||
-        msg.includes("partialread") ||
-        msg.includes("deserialize") ||
-        msg.includes("serialize") ||
-        msg.includes("parse")
-    );
-}
-
 /**
  * Normalizes a Minecraft Bedrock version string for use with bedrock-protocol.
  * GDK-format versions (1.21.120.4) use a 4-part scheme; bedrock-protocol expects
@@ -137,14 +124,7 @@ export async function start() {
     });
 
     // @ts-ignore
-    relay.on("error", (error: Error) => {
-        if (isRecoverableProxyError(error)) {
-            emitProcessingError(error, "Recoverable proxy parse error");
-            return;
-        }
-
-        stop(error);
-    });
+    relay.on("error", (error: Error) => stop(error));
 }
 
 export async function stop(error?: Error) {
